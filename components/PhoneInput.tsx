@@ -1,7 +1,7 @@
 // components/PhoneInput.tsx
-"use client";
 
-import { useState } from "react";
+"use client";
+import { useState, useEffect } from "react";
 
 const COUNTRY_CODES = [
   { code: "AF", dial: "+93",  name: "Afghanistan" },
@@ -78,53 +78,76 @@ const COUNTRY_CODES = [
 ];
 
 interface PhoneInputProps {
-  value: string;
-  onChange: (fullNumber: string) => void;
+  value:     string;
+  onChange:  (fullNumber: string) => void;
   required?: boolean;
 }
 
-export default function PhoneInput({ value, onChange, required = false }: PhoneInputProps) {
-  const [dialCode, setDialCode] = useState("+91");
+export default function PhoneInput({
+  value,
+  onChange,
+  required = false,
+}: PhoneInputProps) {
+  const [dialCode,    setDialCode]    = useState("+91");
   const [localNumber, setLocalNumber] = useState("");
 
+  // Sync internal state when the parent resets or sets value externally.
+  // This makes the component properly controlled.
+  useEffect(() => {
+    // When value is cleared (e.g. form reset), clear both fields.
+    if (!value) {
+      setDialCode("+91");
+      setLocalNumber("");
+      return;
+    }
+
+    // Find the longest matching dial code so "+1" doesn't win over "+91".
+    const match = COUNTRY_CODES
+      .filter(c => value.startsWith(c.dial))
+      .sort((a, b) => b.dial.length - a.dial.length)[0];
+
+    if (match) {
+      setDialCode(match.dial);
+      setLocalNumber(value.slice(match.dial.length).trim());
+    }
+  }, [value]);
+
   function handleDialChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const newDial = e.target.value;
-    setDialCode(newDial);
-    onChange(`${newDial} ${localNumber}`.trim());
+    const d = e.target.value;
+    setDialCode(d);
+    onChange(`${d} ${localNumber}`.trim());
   }
 
   function handleNumberChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const num = e.target.value.replace(/[^\d\s\-()]/g, "");
-    setLocalNumber(num);
-    onChange(`${dialCode} ${num}`.trim());
+    const n = e.target.value.replace(/[^\d\s\-()]/g, "");
+    setLocalNumber(n);
+    onChange(`${dialCode} ${n}`.trim());
   }
 
   return (
     <div className="flex gap-2">
-      {/* Country code selector */}
       <select
         value={dialCode}
         onChange={handleDialChange}
+        aria-label="Country dial code"
         className="form-input flex-shrink-0"
         style={{ width: "160px" }}
-        aria-label="Country dial code"
       >
-        {COUNTRY_CODES.map((c) => (
+        {COUNTRY_CODES.map(c => (
           <option key={`${c.code}-${c.dial}`} value={c.dial}>
             {c.name} ({c.dial})
           </option>
         ))}
       </select>
 
-      {/* Local number */}
       <input
         type="tel"
-        placeholder="Phone number"
         value={localNumber}
         onChange={handleNumberChange}
+        placeholder="Phone number"
         required={required}
-        className="form-input flex-1"
         aria-label="Phone number"
+        className="form-input flex-1"
       />
     </div>
   );
